@@ -1,6 +1,7 @@
 package com.example.Journal.service;
 
 import com.example.Journal.entity.Journal;
+import com.example.Journal.entity.User;
 import com.example.Journal.exception.JournalAlreadyExistsException;
 import com.example.Journal.exception.JournalNotFoundException;
 import com.example.Journal.repository.JournalRepository;
@@ -13,9 +14,11 @@ import java.util.Optional;
 public class JournalService {
 
     private final JournalRepository journalRepository;
+    private final UserService userService;
 
-    public JournalService(JournalRepository journalRepository) {
+    public JournalService(JournalRepository journalRepository, UserService userService) {
         this.journalRepository = journalRepository;
+        this.userService = userService;
     }
 
     public List<Journal> getAllJournal() {
@@ -23,35 +26,61 @@ public class JournalService {
     }
 
     public Journal getJournalById(Long id) {
-        return journalRepository.findById(id).orElseThrow(() ->    new JournalNotFoundException("Journal not found with id " + id));
+        return journalRepository.findById(id).orElseThrow(() -> new JournalNotFoundException("Journal not found with id " + id));
 
     }
 
-    public Journal createJournal(Journal journal) {
-Optional<Journal> newJournal = journalRepository.findByTitle(journal.getTitle());
-        if (newJournal.isPresent()) {
-            throw new JournalAlreadyExistsException("Journal already exists");
+    public Journal createJournal(Journal journal, String userName) {
+
+        if (journal == null) {
+            throw new IllegalArgumentException("Journal data must not be null");
         }
-        return journalRepository.save(journal);
+
+        if (userName == null || userName.isBlank()) {
+            throw new IllegalArgumentException("Username must be provided");
+        }
+
+        User user = userService.findByUserName(userName);
+
+        boolean exists = journalRepository
+                .findByTitleAndUser(journal.getTitle(), user)
+                .isPresent();
+
+        if (exists) {
+            throw new JournalAlreadyExistsException(
+                    "Journal with title '" + journal.getTitle() + "' already exists for this user"
+            );
+        }
+
+        journal.setUser(user);                 // set owning side
+        Journal saved = journalRepository.save(journal);
+
+        return saved;  // no need to manually add to user.getJournals()
     }
 
-    public Journal updateJournal(Long id, Journal journal) {
-        Journal existing = getJournalById(id);
-        if (journalRepository.existsById(id)) {
-            existing.setTitle(journal.getTitle());
-            existing.setContent(journal.getContent());
 
-            return journalRepository.save(existing);
-        }
-        throw new JournalNotFoundException("Journal not found");
+    public Journal updateJournal(Long id, Journal journal, String userName) {
+
+        User user = userService.findByUserName(userName);
+
+        Journal existing = journalRepository.findByIdAndUser(id, user)
+                .orElseThrow(() -> new JournalNotFoundException("Journal not found for this user"));
+
+        existing.setTitle(journal.getTitle());
+        existing.setContent(journal.getContent());
+
+        return journalRepository.save(existing);
     }
 
-    public String deleteJournal(Long id) {
-        if (journalRepository.existsById(id)) {
-            journalRepository.deleteById(id);
-            return "Journal deleted successfully";
-        }
-        return "Journal not found";
+    public String deleteJournal(Long id, String userName) {
+
+        User user = userService.findByUserName(userName);
+
+        Journal existing = journalRepository.findByIdAndUser(id, user)
+                .orElseThrow(() -> new JournalNotFoundException("Journal not found for this user"));
+
+        journalRepository.delete(existing);
+        return "Journal deleted successfully";
     }
 
 }

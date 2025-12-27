@@ -1,16 +1,16 @@
 package com.example.Journal.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.springframework.validation.annotation.Validated;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -31,7 +31,6 @@ public class User {
     private String username;
     @Size(min = 3, max = 10, message = "Password must be 3 to 10 character")
     @NotBlank(message = "Password is required")
-    @JsonIgnore
     private String password;
 
     @CreationTimestamp
@@ -43,13 +42,13 @@ public class User {
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime updatedAt;
 
-
-
     @OneToMany(
             mappedBy = "user",
             cascade = CascadeType.ALL,
             orphanRemoval = true
     )
-    private List<Journal> journals = new ArrayList<>();
+    @JsonManagedReference
+
+    private List<Journal> journals;
 
 }
